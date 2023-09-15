@@ -4,6 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "docker:build": "docker build -t texter .",
+    "docker:start": "docker run -p 8080:8080 texter",
     "start": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

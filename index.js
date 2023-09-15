@@ -1,7 +1,7 @@
-require('dotenv').config();
+require("dotenv").config();
 
-const express = require('express');
-const { sendText } = require('./texter');
+const express = require("express");
+const { sendText } = require("./src/texter");
 
 const app = express();
 
@@ -24,16 +24,24 @@ app.use((req, res, next) => {
   }
 });
 
-app.get('/ping', async (req, res) => {
-  res.send('pong');
+app.get("/ping", async (req, res) => {
+  res.send("pong");
 });
 
-app.get('/send', async (req, res) => {
+app.get("/send", async (req, res) => {
   const { body, to } = req.query;
+  const response = { success: false, query: req.query };
 
-  sendText(body, to);
+  try {
+    const info = await sendText(body, to);
+    console.log(`Text sent: ${JSON.stringify(info.toJSON())}`);
+    response.success = true;
+  } catch (error) {
+    console.log(`Error occurred: ${error.message}`);
+    response.error = error;
+  }
 
-  res.send({ success: "I THINK SO", query: req.query });
+  res.send(response);
 });
 
 const PORT = process.env.PORT || 8080;

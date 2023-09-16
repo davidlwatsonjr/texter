@@ -1,7 +1,7 @@
 require("dotenv").config();
 
 const express = require("express");
-const { sendText } = require("./src/lib/twilio");
+const { sendText } = require("./lib/twilio");
 
 const app = express();
 

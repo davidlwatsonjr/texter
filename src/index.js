@@ -17,7 +17,7 @@ app.use((req, res, next) => {
   const { headers } = req;
 
   if (headers["x-api-key"] !== API_KEY) {
-    console.log(`Invalid API key: ${headers["x-api-key"]}`);
+    console.warn(`Invalid API key: ${headers["x-api-key"]}`);
     res.status(401).send({ error: "Invalid API key" });
   } else {
     next();

@@ -1,9 +1,11 @@
 require("dotenv").config();
 
 const express = require("express");
+
 const { gcpLogTransformer, requestLogger } = require("./middleware/logging");
 const { authAPIRequest } = require("./middleware/apiAuth");
 const { send: sendToTwilio } = require("./controllers/twilio");
+const { serverErrorHandler } = require("./middleware/errors");
 
 const app = express();
 
@@ -18,6 +20,8 @@ app.use(authAPIRequest);
 
 app.get("/twilio/send", sendToTwilio);
 app.get("/send", sendToTwilio);
+
+app.use(serverErrorHandler);
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {

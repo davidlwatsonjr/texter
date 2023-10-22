@@ -37,7 +37,7 @@ app.get("/send", async (req, res) => {
     console.log(`Text sent: ${JSON.stringify(info.toJSON())}`);
     response.success = true;
   } catch (error) {
-    console.log(`Error occurred: ${error.message}`);
+    console.error(`Error occurred: ${error.message}`);
     response.error = error;
   }
 

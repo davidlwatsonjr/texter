@@ -50,9 +50,9 @@ app.get("/send", async (req, res) => {
     console.log(`Text sent: ${JSON.stringify(info.toJSON())}`);
     response.success = true;
   } catch (error) {
-    console.error(`Error occurred: ${error.message}`);
+    console.error(`Error occurred sending text: [${error.status}] - ${error.message}`);
     response.error = error;
-    res.status(error.status || 500);
+    res.status(500);
   }
 
   res.send(response);

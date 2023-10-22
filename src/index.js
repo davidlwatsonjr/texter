@@ -1,7 +1,7 @@
 require("dotenv").config();
 
 const express = require("express");
-const { sendText } = require("./lib/twilio");
+const { send } = require("./controllers/twilio");
 
 const app = express();
 
@@ -41,22 +41,7 @@ app.get("/ping", async (req, res) => {
   res.send("pong");
 });
 
-app.get("/send", async (req, res) => {
-  const { body, to } = req.query;
-  const response = { success: false, query: req.query };
-
-  try {
-    const info = await sendText(body, to);
-    console.log(`Text sent: ${JSON.stringify(info.toJSON())}`);
-    response.success = true;
-  } catch (error) {
-    console.error(`Error occurred sending text: [${error.status}] - ${error.message}`);
-    response.error = error;
-    res.status(500);
-  }
-
-  res.send(response);
-});
+app.get("/send", send);
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {

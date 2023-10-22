@@ -52,6 +52,7 @@ app.get("/send", async (req, res) => {
   } catch (error) {
     console.error(`Error occurred: ${error.message}`);
     response.error = error;
+    res.status(error.status || 500);
   }
 
   res.send(response);

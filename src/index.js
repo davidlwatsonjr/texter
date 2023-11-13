@@ -2,10 +2,13 @@ require("dotenv").config();
 
 const express = require("express");
 
-const { gcpLogTransformer, requestLogger } = require("./middleware/logging");
-const { authAPIRequest } = require("./middleware/apiAuth");
+const {
+  gcpLogTransformer,
+  requestLogger,
+  authAPIRequest,
+  serverErrorHandler,
+} = require("@davidlwatsonjr/microservice-middleware");
 const { send: sendToTwilio } = require("./controllers/twilio");
-const { serverErrorHandler } = require("./middleware/errors");
 
 const app = express();
 

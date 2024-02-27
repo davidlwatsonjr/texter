@@ -1,1 +1,4 @@
-.env
+.gcloudignore
+.git
+.gitignore
+#!include:.gitignore

@@ -10,7 +10,7 @@ const send = async (req, res) => {
     response.success = true;
   } catch (error) {
     console.error(
-      `Error occurred sending text: [${error.status}] - ${error.message}`
+      `Error occurred sending text: [${error.status}] - ${error.message}`,
     );
     response.error = error;
     res.status(500);

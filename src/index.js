@@ -29,6 +29,6 @@ app.use(serverErrorHandler);
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(
-    `The texter app started successfully and is listening for HTTP requests on ${PORT}`
+    `The texter app started successfully and is listening for HTTP requests on ${PORT}`,
   );
 });

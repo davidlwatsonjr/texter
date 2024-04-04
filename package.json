@@ -4,7 +4,11 @@
   "description": "",
   "main": "src/index.js",
   "scripts": {
+    "predeploy": "gcloud config set project davidlwatsonjr && gcloud -q artifacts docker images delete us-east1-docker.pkg.dev/davidlwatsonjr/cloud-run-source-deploy/texter --delete-tags",
+    "deploy": "gcloud run deploy texter --source .",
+    "postdeploy": "gsutil -m rm -r gs://davidlwatsonjr_cloudbuild/**",
     "docker:build": "docker build -t texter .",
+    "predocker:start": "npm run docker:build",
     "docker:start": "docker run -p 8080:8080 texter",
     "eslint": "eslint",
     "format": "prettier --write \"src/**/*.js\"",

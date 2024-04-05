@@ -1,5 +1,3 @@
-require("dotenv").config();
-
 const { sendText } = require("../lib/twilio");
 
 const [, , to, ...rest] = process.argv;

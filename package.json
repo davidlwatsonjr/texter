@@ -16,7 +16,7 @@
     "lint": "eslint **/*.{js,jsx} --quiet",
     "lint:fix": "eslint --fix src/**/*.js",
     "prettier": "prettier",
-    "start": "node src/index.js",
+    "start": "node --env-file=.env src/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -24,14 +24,13 @@
   "license": "ISC",
   "dependencies": {
     "@davidlwatsonjr/microservice-middleware": "^1.0.0",
-    "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "twilio": "^4.17.0"
   },
   "devDependencies": {
-    "eslint": "^8.56.0",
+    "eslint": "^8.57.0",
     "eslint-config-google": "^0.14.0",
     "eslint-config-prettier": "^9.1.0",
-    "prettier": "^3.1.1"
+    "prettier": "^3.2.5"
   }
 }

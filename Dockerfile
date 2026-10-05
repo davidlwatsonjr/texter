@@ -19,4 +19,5 @@ RUN npm ci --only=production
 COPY . ./
 
 # Run the web service on container startup.
-CMD ["npm", "start"]
+# Cloud Run supplies runtime environment variables; no local .env is required.
+CMD ["node", "src/index.js"]

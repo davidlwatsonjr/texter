@@ -38,13 +38,28 @@ gcloud run services list --project=davidlwatsonjr \
 Record the region of texter. Do not infer it from a local gcloud default.
 Check that the service's runtime environment variables and Secret Manager
 references contain the values it needs. The container now starts with
-node src/index.js and relies on those Cloud Run settings, rather than a local
-.env file. Existing runtime environment, secrets, runtime service account,
+npm start when a .env file is present, preserving its existing .env loading.
+When .env is absent, it starts node src/index.js and uses Cloud Run's runtime
+configuration. Existing runtime environment, secrets, runtime service account,
 and ingress settings are not supplied or replaced by this workflow.
 If the service already receives a JSON secret bundle through SECRETS, keep that
 Secret Manager binding. The application expands it into environment variables.
 GitHub does not fetch application secrets or create a .env file. Confirm that
 this runtime configuration is present before deploying the container change.
+
+## Local deployment compatibility
+
+Merging only adds a manual workflow; no push or pull-request deployment runs.
+GitHub variables and IAM permissions are needed only when you manually run it.
+A missing required GitHub variable stops the workflow before authentication or
+deployment. An IAM failure stops the run at the operation that needs that access.
+
+The existing gcloud run deploy texter --source . command and npm run deploy
+remain usable with your existing local Google credentials. This PR does not
+change package.json or its deployment hooks. Container startup still uses
+npm start when .env exists, so that deployment path continues to load it.
+Without .env, startup uses node src/index.js with the runtime environment.
+No GitHub configuration is required for local gcloud deployment.
 
 ## 2. Create the shared trust pool (once for all five repos)
 

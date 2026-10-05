@@ -3,9 +3,12 @@
 The Deploy to Cloud Run workflow runs only when you click Run workflow on the
 main branch. Merging this PR does not deploy anything.
 
-Each run deploys the checked-out commit of texter to the existing Cloud Run
-service, directs 100% of traffic to the latest revision, and checks /ping.
-The run summary records the commit and service URL. Runs are serialized.
+Each run builds the checked-out commit of texter with Docker on the GitHub-hosted
+runner, pushes the image to Artifact Registry, and deploys that exact image digest
+to the existing Cloud Run service. Cloud Build is not used. Artifact Registry
+stores the image, and Cloud Run runs it. Builds target linux/amd64.
+The workflow directs 100% of traffic to the latest revision and checks /ping.
+The run summary records the commit, image digest, and service URL. Runs are serialized.
 A failed post-deployment health check does not automatically roll traffic back.
 
 ## 1. Confirm the existing service
@@ -23,6 +26,9 @@ references contain the values it needs. The container now starts with
 node src/index.js and relies on those Cloud Run settings, rather than a local
 .env file. Existing runtime environment, secrets, runtime service account,
 and ingress settings are not supplied or replaced by this workflow.
+If the service already receives a JSON secret bundle as SECRETS, keep that binding.
+The application expands that bundle into environment variables at startup.
+The GitHub runner does not fetch the application secret or create a .env file.
 
 ## 2. Create the shared trust pool (once for all five repos)
 
@@ -36,7 +42,7 @@ PROJECT_ID="davidlwatsonjr"
 PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
 POOL_ID="github-deploy"
 
-gcloud services enable run.googleapis.com cloudbuild.googleapis.com \
+gcloud services enable run.googleapis.com \
   artifactregistry.googleapis.com iam.googleapis.com \
   iamcredentials.googleapis.com sts.googleapis.com --project="$PROJECT_ID"
 
@@ -74,8 +80,9 @@ gcloud iam service-accounts add-iam-policy-binding "$DEPLOY_EMAIL" \
   --role="roles/iam.workloadIdentityUser" \
   --member="principalSet://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${POOL_ID}/attribute.repository_id/${REPOSITORY_ID}"
 
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:$DEPLOY_EMAIL" --role="roles/run.sourceDeveloper"
+gcloud run services add-iam-policy-binding "$SERVICE" \
+  --project="$PROJECT_ID" --region="$REGION" \
+  --member="serviceAccount:$DEPLOY_EMAIL" --role="roles/run.developer"
 gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member="serviceAccount:$DEPLOY_EMAIL" --role="roles/serviceusage.serviceUsageConsumer"
 
@@ -91,35 +98,47 @@ gcloud iam service-accounts add-iam-policy-binding "$RUNTIME_ACCOUNT" \
 
 Each repo gets its own deployer identity. The provider admits only the numeric
 owner/repo IDs above, the default branch, and manual workflow events.
-The built-in Source Developer role is granted at project scope as required for
-source deployment; it is broader than permission to update just one service.
+Cloud Run Developer is scoped to the existing service. Service Account User is
+scoped to that service's runtime identity. Workload Identity User lets this
+repository impersonate its deployment account.
 
-## 4. Confirm the Cloud Build identity
+## 4. Create an Artifact Registry repository and grant image access
 
-This workflow uses Cloud Run's default source-build identity. Identify it:
-
-~~~bash
-gcloud builds get-default-service-account --project="$PROJECT_ID" --region="$REGION"
-~~~
-
-Copy its service-account email into BUILD_ACCOUNT below. If the output is a
-resource path, use the email after serviceAccounts/. This is a different role
-from the Cloud Run runtime identity; they can happen to use the same account.
+Use one Docker repository per service, in the same project and region as Cloud Run.
+Create it once; if an appropriate repository already exists, reuse it and set
+ARTIFACT_REPOSITORY to its name instead.
 
 ~~~bash
-BUILD_ACCOUNT="REPLACE_WITH_BUILD_SERVICE_ACCOUNT_EMAIL"
+ARTIFACT_REPOSITORY="$SERVICE"
 
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:$BUILD_ACCOUNT" --role="roles/run.builder"
+gcloud artifacts repositories create "$ARTIFACT_REPOSITORY" \\
+  --project="$PROJECT_ID" --location="$REGION" --repository-format=docker \\
+  --description="Container images for $SERVICE built by GitHub Actions"
 
-gcloud iam service-accounts add-iam-policy-binding "$BUILD_ACCOUNT" \
-  --project="$PROJECT_ID" --member="serviceAccount:$DEPLOY_EMAIL" \
-  --role="roles/iam.serviceAccountUser"
+gcloud artifacts repositories add-iam-policy-binding "$ARTIFACT_REPOSITORY" \\
+  --project="$PROJECT_ID" --location="$REGION" \\
+  --member="serviceAccount:$DEPLOY_EMAIL" --role="roles/artifactregistry.writer"
 ~~~
 
-An existing custom build identity should be reviewed before adopting the default
-build identity. If you need to preserve a custom identity, add an explicit
---build-service-account flag to the workflow and authorize that account instead.
+Artifact Registry Writer includes read access needed for deployment. The deployer
+can push images only to its assigned repository. No Cloud Build API, build service
+account, or Cloud Run Builder role is needed for this workflow.
+For repositories in this same project, the Cloud Run service agent's existing
+Cloud Run Service Agent role normally includes image read access. If that role
+was customized, confirm that it can read this Artifact Registry repository.
+
+If you followed the earlier source-deployment setup, keep the pool, provider,
+deployment account, Workload Identity User binding, and Service Usage Consumer
+role. After granting the service-level Cloud Run Developer role above, remove the
+project-level Source Developer grant from this dedicated deployment account:
+
+~~~bash
+gcloud projects remove-iam-policy-binding "$PROJECT_ID" \\
+  --member="serviceAccount:$DEPLOY_EMAIL" --role="roles/run.sourceDeveloper"
+~~~
+
+Skip that removal command if the grant was never added. Review any existing
+Cloud Build permissions before removing them; other deployments may still use them.
 
 ## 5. Set GitHub repository variables
 
@@ -129,7 +148,8 @@ Add these repository variables, not JSON credential secrets:
 | Variable | Value |
 | --- | --- |
 | GCP_PROJECT_ID | davidlwatsonjr |
-| GCP_REGION | The existing service region recorded above |
+| GCP_REGION | The existing service region recorded above; also the Artifact Registry location |
+| GCP_ARTIFACT_REPOSITORY | texter, or the existing Docker repository chosen above |
 | GCP_DEPLOY_SERVICE_ACCOUNT | github-texter-deploy@davidlwatsonjr.iam.gserviceaccount.com |
 | GCP_WORKLOAD_IDENTITY_PROVIDER | Full provider name from the command below |
 | CLOUD_RUN_HEALTHCHECK_URL | Optional full HTTPS /ping URL, if the default run.app URL is unavailable |
@@ -143,7 +163,8 @@ gcloud iam workload-identity-pools providers describe "$SERVICE" \
 The provider name contains the numeric project number, not the project ID.
 No service-account key needs to be created, downloaded, or uploaded.
 Temporary credentials generated during the job are excluded from git,
-Cloud Build source uploads, and the Docker build context.
+source uploads, and the Docker build context. Docker builds finish before Google
+credentials are created.
 
 Allow several minutes for IAM changes to propagate. The health check assumes
 its URL is reachable publicly. For a private service, adapt the health check
@@ -156,7 +177,9 @@ Select main and click Run workflow. Feature-branch runs are skipped.
 Choose movies as the first service if configuring all five repositories.
 
 The job checks required variables and confirms the service exists before
-deploying. Deployment uses the existing Dockerfile through Cloud Build.
+deploying. Docker builds the image on the GitHub runner using the existing
+Dockerfile. Each image tag includes the commit SHA, workflow run ID, and attempt;
+the deployment uses the pushed image digest rather than a mutable latest tag.
 It invokes the deployment action directly rather than npm run deploy, so the
 legacy predeploy/postdeploy image and bucket deletion scripts are not run.
 
@@ -166,7 +189,8 @@ Cloud Run's latest revision and traffic settings before retrying.
 
 ## References
 
-- [Source deployment roles](https://docs.cloud.google.com/run/docs/deploying-source-code)
+- [Container image deployment roles](https://docs.cloud.google.com/run/docs/deploying)
+- [Artifact Registry access control](https://docs.cloud.google.com/artifact-registry/docs/access-control)
 - [Workload Identity Federation for deployment pipelines](https://docs.cloud.google.com/iam/docs/workload-identity-federation-with-deployment-pipelines)
 - [Google authentication action](https://github.com/google-github-actions/auth)
 - [Google Cloud Run deployment action](https://github.com/google-github-actions/deploy-cloudrun)
